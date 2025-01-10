@@ -6,29 +6,20 @@ const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Using import or export module
 import express from "express";
 import { MongoClient } from 'mongodb';
-import bodyParser from 'body-parser';
 import os from 'os';
+import { publicIpv4 } from 'public-ip';
 
-import { publicIp, publicIpv4, publicIpv6 } from 'public-ip';
+// MongoDB URL (Docker container ya localhost ke liye)
+const mongoUrl = 'mongodb://mongo-db:27017/';  // Docker ke liye
+// const mongoUrl = 'mongodb://localhost:27017/'; // Localhost ke liye
 
-// // Using require
-// const express = require("express");
-// const { MongoClient } = require('mongodb');
-// const bodyParser = require("body-parser");
-// const os = require('os');
+const client = new MongoClient(mongoUrl);
+const db = client.db('mydatabase');
+const collection = db.collection('mycollection');
 
-
-// For mongodb
-const  mongoUrl= 'mongodb://3.81.12.106:27017/'// Replace with mongodb server IP
-const client = new MongoClient(mongoUrl); 
-
-const db = client.db('mydatabase'); // Name of your database
-const collection = db.collection('mycollection'); // Name of your collection
-
-// Database connection function
+// MongoDB connection function
 async function connectToMongoDB() {
     try {
       await client.connect();
@@ -36,65 +27,53 @@ async function connectToMongoDB() {
     } catch (error) {
       console.error('Error connecting to MongoDB Server:', error);
     }
-  }
-  
+}
 connectToMongoDB();
-
-// await client.close(); // Close the connection
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(express.json()); 	
+
+// Static files serve from 'public' directory
+app.use(express.static(__dirname + '/public'));
+
 // Home page
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+    res.sendFile(__dirname + '/public/index.html');
 });
 
-// Parse incoming requests with JSON payloads
-app.use(express.json());
-app.use(express.static('/')); // Serve static files from root directory also we can use 'public' directory
-
-// Insert data to MongoDB server
+// Insert data to MongoDB
 app.post('/insertData', async (req, res) => {
     const data = req.body;
 
     try {
-        // Check for duplicates
         const existingData = await collection.findOne({ email: data.email });
 
         if (existingData) {
-            return res.send(' email already exists, user adding fail!!');
-            // return res.status(400).send(' email already exists');
+            return res.send('Email already exists, user adding failed!');
         }
 
-        // Insert the data
         await collection.insertOne(data);
-        res.status(200).send(' added successfully');
-        //   console.log('User added successfully....')
-
-
+        res.status(200).send('Added successfully!');
     } catch (error) {
-        // console.error('Error inserting data:', error);
-        return res.status(500).send(' add Error');
+        return res.status(500).send('Error adding data');
     }
 });
 
-// Get data from MongoDB server
+// Fetch data from MongoDB
 app.get('/fetchData', async (req, res) => {
-    const data = await collection.find({}).limit(12).sort({ _id: -1 }).toArray()
+    const data = await collection.find({}).limit(12).sort({ _id: -1 }).toArray();
     res.json(data);
-    // console.log('User fetch successfully....')
 });
-
 
 // Find host and ip address
 app.get('/hostinfo', async (req, res) => {
-
-    const hostname = os.hostname(); // Get the server's hostname
+    const hostname = os.hostname();
     const networkInterfaces = os.networkInterfaces();
     let privateIp = '';
 
-    // Find the private IP address
+    // Find private IP
     for (const iface in networkInterfaces) {
         for (let i = 0; i < networkInterfaces[iface].length; i++) {
             if (networkInterfaces[iface][i].family === 'IPv4' && !networkInterfaces[iface][i].internal) {
@@ -104,6 +83,7 @@ app.get('/hostinfo', async (req, res) => {
         }
         if (privateIp) break;
     }
+
     let publicIpAddress = await publicIpv4();
 
     const hostinfo = {
@@ -111,9 +91,11 @@ app.get('/hostinfo', async (req, res) => {
         privateIp,
         publicIpAddress
     };
+
     res.json(hostinfo);
 });
 
+// Server listening
 app.listen(PORT, () => {
-    console.log('Server is running on', PORT);
+    console.log('Server is running on port', PORT);
 });
