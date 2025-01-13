@@ -1,0 +1,7 @@
+---
+# defaults file for docker_compose_deployment
+docker_compose_project_name: nodejs_demo_app
+docker_compose_project_path: /home/cloudops/nodejs-demo-app
+docker_compose_ports: "5000:5000"
+docker_compose_network: app_network
+docker_compose_files: "/home/cloudops/nodejs-demo-app/docker-compose.yml"
